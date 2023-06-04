@@ -1,7 +1,7 @@
 # Fake-news-detection-Comparative-Study
 Official implementation of the paper : "All About Automatic Fake News Detection: A Wide Comparative Study" by Faramarz Farhangian, Rafael M. O. Cruz, Woshington V. de Souza and George D. C. Cavalcanti.
 
-![alt text](https://github.com/FFarhangian/Fake-news-detection-Benchmark-Study/blob/main/Fake%20news%20tweet%20example.jpg "Logo Title Text 1")
+![alt text](https://github.com/FFarhangian/Fake-news-detection-Benchmark-Study/blob/main/Images/Fake%20news%20tweet%20example.jpg "Logo Title Text 1")
 
 ## Highlights
 The contributions of this paper compared to other reviews on fake news detection are the following:
@@ -48,7 +48,7 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 
 [George McIntire (GM)](https://github.com/joolsa/fake_real_news_dataset/raw/master/fake_or_real_news.csv.zip) dataset consists of 11,000 real news articles and 3,151 fake news articles from prominent mainstream media sources such as the New York Times, Wall Street Journal, Bloomberg, and the Guardian. The articles cover a wide range of topics including politics, business, technology, entertainment, and more. Journalists have fact-checked the news articles to assign labels in the dataset.
 
-![alt text](https://github.com/FFarhangian/Fake-news-detection-Benchmark-Study/blob/main/Wordcloud.png "Logo Title Text 2")
+![alt text](https://github.com/FFarhangian/Fake-news-detection-Benchmark-Study/blob/main/Images/Wordcloud.png "Logo Title Text 2")
 
 ## References
 [1] W. Y. Wang, " liar, liar pants on fire": A new benchmark dataset for fake news detection, arXiv preprint arXiv:1705.00648 (2017).
