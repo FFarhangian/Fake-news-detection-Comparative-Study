@@ -13,9 +13,9 @@ The contributions of this paper compared to other reviews on fake news detection
 ## Organization
 - **Pre_Processing.py** file contains the necessary functions for *Loading*, *Cleaning*, *Visualizing*, *Pre-Processing*, and *Segmenting* the datasets.
 - **Feature_extraction.py** file includes 13 techniques for extracting multiple representations from text over four datasets. These techniques can be categorized into **count-based methods** (*e.g., TF (Term Frequency) and TF-IDF (Term frequency-inverse document frequency*)), **context-independent methods** (*e.g., Word2Vec, GloVe, and fastText*). **Context-dependent methods** (*e.g., BERT ('bert-base-uncased'), DistilBERT ('distilbert-base-uncased'), ALBERT ('albert-base-v2'), RoBERTa ('roberta-base'), BART ('facebook-bart-large'), ELECTRA ('google-electra-base-discriminator'), XLNet ('xlnet-base-cased'), and ELMO*).
-- C
-- D
-- E
+- **Classification_models.py**
+- **Complexity_analysis.py**
+- **Error_analysis.py**
 ## Requirements
 To use this code, you need to have Python version 3.10 or higher. The required library can be installed by running the following command: *pip install -r requirements.txt*.
 
