@@ -19,10 +19,10 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 
 | **Library**    | **Version**   |
 |:-------------: |:-------------:|
-| NLTK           | 3.7           |
-| Scikit-Learn   | 1.0.1         |
-| Gensim         | 3.6.0         |
-| Zeugma         | 0.49          |
+| nltk           | 3.7           |
+| scikit-learn   | 1.0.1         |
+| gensim         | 3.6.0         |
+| zeugma         | 0.49          |
 | huggingface_hub| 0.15.1        |
 | transformers   | 4.29.2        |
 | xgboost        | 1.7.5         |
@@ -32,6 +32,7 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 | matplotlib     | 3.7.1         |
 | re             | 3.11.3        |
 | tensorflow     | 2.12.0        |
+| keras          | 2.12.0        |
 | PyTorch        | 2.0           |
 
 
