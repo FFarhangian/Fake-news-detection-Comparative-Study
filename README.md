@@ -11,7 +11,7 @@ The contributions of this paper compared to other reviews on fake news detection
 - It compares different methods in the way of cost-effectiveness.
 - It proposes multiple perspectives for future research based on the analysis conducted in this work.
 ## Organization
-- **processing.py** file contains the necessary functions for *Loading*, *Cleaning*, *Visualizing*, *Pre-Processing*, and *Segmenting* the datasets.
+- **Pre_Processing.py** file contains the necessary functions for *Loading*, *Cleaning*, *Visualizing*, *Pre-Processing*, and *Segmenting* the datasets.
 - B
 - C
 - D
