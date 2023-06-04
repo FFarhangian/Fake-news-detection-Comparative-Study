@@ -1,6 +1,8 @@
 # Fake-news-detection-Comparative-Study
 Official implementation of the paper : "All About Automatic Fake News Detection: A Wide Comparative Study" by Faramarz Farhangian, Rafael M. O. Cruz, Woshington V. de Souza and George D. C. Cavalcanti.
 
+![alt text](https://github.com/FFarhangian/Fake-news-detection-Benchmark-Study/blob/main/Fake%20news%20tweet%20example.jpg "Logo Title Text 1")
+
 ## Highlights
 The contributions of this paper compared to other reviews on fake news detection are the following:
 - It proposes an up-to-date taxonomy for textual-based fake news detection models and feature extraction methods.
