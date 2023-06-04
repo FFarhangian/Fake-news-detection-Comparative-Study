@@ -36,6 +36,8 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 | tensorflow     | 2.12.0        |
 | keras          | 2.12.0        |
 | PyTorch        | 2.0           |
+| palmerpenguins | 0.1.4         |
+| seaborn        | 0.12.2        |
 
 
 
