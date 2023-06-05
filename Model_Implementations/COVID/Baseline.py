@@ -1,5 +1,8 @@
 from sklearn.dummy import DummyClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+import numpy as np
+import matplotlib
+import timeit
 
 df3_baseline_model = DummyClassifier(strategy='most_frequent')
 
