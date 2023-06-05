@@ -354,7 +354,7 @@ joblib.dump(gridcv_SVM, 'df2_ELMO_SVM.sav')
 start_train = timeit.default_timer()
 df2_BERT_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("bert-base-uncased")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_BERT_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -410,7 +410,7 @@ joblib.dump(gridcv_SVM, 'df2_BERT_SVM.sav')
 start_train = timeit.default_timer()
 df2_DistilBERT_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("distilbert-base-uncased")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_DistilBERT_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -466,7 +466,7 @@ joblib.dump(gridcv_SVM, 'df2_DistilBERT_SVM.sav')
 start_train = timeit.default_timer()
 df2_ALBERT_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("albert-base-v2")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_ALBERT_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -522,7 +522,7 @@ joblib.dump(gridcv_SVM, 'df2_ALBERT_SVM.sav')
 start_train = timeit.default_timer()
 df2_BART_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("facebook/bart-base")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_BART_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -578,7 +578,7 @@ joblib.dump(gridcv_SVM, 'df2_BART_SVM.sav')
 start_train = timeit.default_timer()
 df2_RoBERTa_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("roberta-base")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_RoBERTa_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -634,7 +634,7 @@ joblib.dump(gridcv_SVM, 'df2_RoBERTa_SVM.sav')
 start_train = timeit.default_timer()
 df2_ELECTRA_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("google/electra-small-discriminator")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_ELECTRA_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -690,7 +690,7 @@ joblib.dump(gridcv_SVM, 'df2_ELECTRA_SVM.sav')
 start_train = timeit.default_timer()
 df2_XLNET_SVM = Pipeline([
     ("embedding", HFTransformersLanguage("xlnet-base-cased")),
-    ("model", LogisticRegression())
+    ("model", SVC())
 ])
 gridcv_SVM = GridSearchCV(df2_XLNET_SVM, param_grid = grid_SVM, scoring='f1_micro', cv= 5, n_jobs = -1, verbose = 2, refit = True)
 gridcv_SVM.fit(df2_X_train, df2_y_train)
@@ -739,3 +739,4 @@ plt.show()
 # Saved model and preds
 np.savetxt("df2_XLNET_SVM_pred.csv", df2_XLNET_SVM_pred, delimiter=",")
 joblib.dump(gridcv_SVM, 'df2_XLNET_SVM.sav')
+
