@@ -1,14 +1,31 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
+from sklearn.model_selection import train_test_split, KFold, PredefinedSplit
+from nltk.corpus import stopwords
+from nltk import word_tokenize
+from nltk import sent_tokenize
+from nltk.stem.porter import PorterStemmer
+from nltk.stem import WordNetLemmatizer
+from unicodedata import normalize
+from wordcloud import WordCloud
+import pandas as pd
+import numpy as np
+import matplotlib
+import nltk
+import spacy
+import re
+import gensim
+import string
+import matplotlib.pyplot as plt
 
-#Loading
+# Loading
 df1 = pd.read_excel("/content/gdrive/MyDrive/Datasets/Liarr.xlsx")
 df2 = pd.read_excel("/content/gdrive/MyDrive/Datasets/ISOT.xlsx")
 df3 = pd.read_excel("/content/gdrive/MyDrive/Datasets/Covid-2.xlsx")
 df4 = pd.read_excel("/content/gdrive/MyDrive/Datasets/GeorgeMcIntire.xlsx")
 
-#Cleaning
+# Cleaning
 df1 = df1.drop(columns=['ID', 'Subject', 'Speaker', 'Job', 'State', 'Party', 'BTC', 'FC', 'HTC', 'MTC', 'POFC', 'Context','Type'])
 df2 = df2.drop(columns=['title', 'subject', 'date'])
 df3 = df3.drop(columns=['id', 'Type'])
@@ -19,13 +36,13 @@ df2.rename(columns = {'text':'Text', 'Type':'Label'}, inplace = True)
 df3.rename(columns = {'tweet':'Text', 'label':'Label'}, inplace = True)
 df4.rename(columns = {'text':'Text', 'label':'Label'}, inplace = True)
 
-#Visualizing
+# Visualizing
 print ("df1 dimention is: ", df1.shape, "\n", "df1 columns name are :", df1.columns, "\n", "Label distribution is: \n", df1['Label'].value_counts(), "\n", "Average length is: ", df1['Text'].str.len().mean(), "\n", "###############")
 print ("df2 dimention is: ", df2.shape, "\n", "df2 columns name are :", df2.columns, "\n", "Label distribution is: \n", df2['Label'].value_counts(), "\n", "Average length is: ", df2['Text'].str.len().mean(), "\n", "###############")
 print ("df3 dimention is: ", df3.shape, "\n", "df3 columns name are :", df3.columns, "\n", "Label distribution is: \n", df3['Label'].value_counts(), "\n", "Average length is: ", df3['Text'].str.len().mean(), "\n", "###############")
 print ("df4 dimention is: ", df4.shape, "\n", "df4 columns name are :", df4.columns, "\n", "Label distribution is: \n", df4['Label'].value_counts(), "\n", "Average length is: ", df4['Text'].str.len().mean(), "\n", "###############")
 
-#WordCloud
+# WordCloud
 text1 = " ".join(t for t in df1.Text)
 word_cloud = WordCloud(collocations = False, background_color = 'black').generate(text1)
 plt.imshow(word_cloud, interpolation='bilinear')
@@ -54,7 +71,7 @@ plt.axis("off")
 plt.savefig('word_cloud4.pdf', dpi=1000)
 plt.show()
 
-#Pre-Process
+# Pre-Process
 #Download Dicts
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -386,7 +403,7 @@ df4["Token"] = df4["Token"].apply(lambda x: stemmer(x))
 df4["Token"] = df4["Token"].apply(lambda x: lemmatizer(x))
 print("Pre-processed dataset-4")
 
-#Data Segmentation
+# Data Segmentation
 df1_train, df1_test, df1_train_class, df1_test_class = train_test_split(df1['Text'], df1['Label'], test_size=0.25, random_state=42)
 df2_train, df2_test, df2_train_class, df2_test_class = train_test_split(df2['Text'], df2['Label'], test_size=0.25, random_state=42)
 df3_train, df3_test, df3_train_class, df3_test_class = train_test_split(df3['Text'], df3['Label'], test_size=0.25, random_state=42)
