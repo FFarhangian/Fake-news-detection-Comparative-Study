@@ -19,6 +19,8 @@ from transformers import BartModel, BartTokenizer
 from transformers import RobertaModel, RobertaTokenizer
 from transformers import ElectraModel, ElectraTokenizer
 from transformers import XLNetModel, XLNetTokenizer
+from allennlp.commands.elmo import ElmoEmbedder
+
 
 
 
@@ -266,6 +268,99 @@ for i in range(0, len(df4_test.tolist()), batch_num):
 
 savez_compressed('ELMO_df4_test.npz', ELMO_df4_test)
 print(ELMO_df4_test.shape)
+
+# ELMO another approach
+# ELMO
+from allennlp.commands.elmo import ElmoEmbedder
+import numpy as np
+
+# Load the ELMo model
+elmo = ElmoEmbedder()
+
+def extract_features(text):
+    embeddings = elmo.embed_sentence(text)
+    features = embeddings.mean(axis=0)  # Take the mean of the word embeddings
+    return features
+
+text_data_train = df1_train.tolist()
+feature_matrix_train = []
+for text in text_data_train:
+    features = extract_features(text)
+    feature_matrix_train.append(features)
+
+feature_matrix_train = torch.cat(feature_matrix_train, dim=0)
+
+np.savez_compressed('ELMO_df1_train.npz', feature_matrix_train.numpy())
+
+text_data_test = df1_test.tolist()
+feature_matrix_test = []
+for text in text_data_test:
+    features = extract_features(text)
+    feature_matrix_test.append(features)
+
+feature_matrix_test = torch.cat(feature_matrix_test, dim=0)
+
+np.savez_compressed('ELMO_df1_test.npz', feature_matrix_test.numpy())
+
+text_data_train = df2_train.tolist()
+feature_matrix_train = []
+for text in text_data_train:
+    features = extract_features(text)
+    feature_matrix_train.append(features)
+
+feature_matrix_train = torch.cat(feature_matrix_train, dim=0)
+
+np.savez_compressed('ELMO_df2_train.npz', feature_matrix_train.numpy())
+
+text_data_test = df2_test.tolist()
+feature_matrix_test = []
+for text in text_data_test:
+    features = extract_features(text)
+    feature_matrix_test.append(features)
+
+feature_matrix_test = torch.cat(feature_matrix_test, dim=0)
+
+np.savez_compressed('ELMO_df2_test.npz', feature_matrix_test.numpy())
+
+text_data_train = df3_train.tolist()
+feature_matrix_train = []
+for text in text_data_train:
+    features = extract_features(text)
+    feature_matrix_train.append(features)
+
+feature_matrix_train = torch.cat(feature_matrix_train, dim=0)
+
+np.savez_compressed('ELMO_df3_train.npz', feature_matrix_train.numpy())
+
+text_data_test = df3_test.tolist()
+feature_matrix_test = []
+for text in text_data_test:
+    features = extract_features(text)
+    feature_matrix_test.append(features)
+
+feature_matrix_test = torch.cat(feature_matrix_test, dim=0)
+
+np.savez_compressed('ELMO_df3_test.npz', feature_matrix_test.numpy())
+
+text_data_train = df4_train.tolist()
+feature_matrix_train = []
+for text in text_data_train:
+    features = extract_features(text)
+    feature_matrix_train.append(features)
+
+feature_matrix_train = torch.cat(feature_matrix_train, dim=0)
+
+np.savez_compressed('ELMO_df4_train.npz', feature_matrix_train.numpy())
+
+text_data_test = df4_test.tolist()
+feature_matrix_test = []
+for text in text_data_test:
+    features = extract_features(text)
+    feature_matrix_test.append(features)
+
+feature_matrix_test = torch.cat(feature_matrix_test, dim=0)
+
+np.savez_compressed('ELMO_df4_test.npz', feature_matrix_test.numpy())
 
 # BERT
 model_name = "bert-base-uncased"
