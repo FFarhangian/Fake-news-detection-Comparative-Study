@@ -65,4 +65,10 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 
 [5] P. Patwa, S. Sharma, S. PYKL, V. Guptha, G. Kumari, M. S. Akhtar, A. Ekbal, A. Das, T. Chakraborty, Fighting an infodemic: Covid-19 fake news dataset (2020). arXiv:2011.03327.
 
+## Citation
+Please consider citing our paper in your publications if the project helps your research. The BibTeX reference is as follows:
+'''
+
+'''
+
 
