@@ -561,7 +561,6 @@ np.savez_compressed('DistilBERT_df4_test.npz', feature_matrix_test.numpy())
 
 
 # ALBERT
-# ALBERT
 model_name = "albert-base-v2"
 model = AlbertModel.from_pretrained(model_name)
 tokenizer = AlbertTokenizer.from_pretrained(model_name)
