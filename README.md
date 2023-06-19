@@ -67,8 +67,6 @@ To use this code, you need to have Python version 3.10 or higher. The required l
 
 ## Citation
 Please consider citing our paper in your publications if the project helps your research. The BibTeX reference is as follows:
-'''
 
-'''
 
 
