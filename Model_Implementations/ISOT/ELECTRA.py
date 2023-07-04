@@ -48,7 +48,7 @@ class ELECTRA_Arch(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, sent_id, mask):
-        cls_hs, = self.bart(sent_id, attention_mask=mask)
+        cls_hs, = self.electra(sent_id, attention_mask=mask)
         cls_hs = cls_hs.mean(dim=1)
         x = self.fc1(cls_hs)
         x = self.relu(x)
