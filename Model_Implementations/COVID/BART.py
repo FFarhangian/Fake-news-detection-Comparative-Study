@@ -16,7 +16,7 @@ torch.manual_seed(2023)
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define the RoBERTa model and tokenizer
+# Define the BART model and tokenizer
 bart_model_name = "facebook/bart-large"
 bart = AutoModel.from_pretrained(bart_model_name)
 tokenizer = AutoTokenizer.from_pretrained(bart_model_name)
