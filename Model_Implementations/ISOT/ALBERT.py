@@ -16,7 +16,7 @@ torch.manual_seed(2023)
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define the RoBERTa model and tokenizer
+# Define the ALBERT model and tokenizer
 albert_model_name = "albert-base-v2"
 albert = AutoModel.from_pretrained(albert_model_name)
 tokenizer = AutoTokenizer.from_pretrained(albert_model_name)
