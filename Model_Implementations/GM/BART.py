@@ -80,20 +80,20 @@ def train(model, train_dataloader):
     return avg_loss, total_preds
 
 
-df3_tokens_train = tokenize_sequences(df3_train.tolist())
-df3_tokens_test = tokenize_sequences(df3_test.tolist())
+df4_tokens_train = tokenize_sequences(df4_train.tolist())
+df4_tokens_test = tokenize_sequences(df4_test.tolist())
 
 # Convert the encodings to PyTorch tensors
-df3_train_seq = torch.tensor(df3_tokens_train['input_ids'])
-df3_train_mask = torch.tensor(df3_tokens_train['attention_mask'])
-df3_train_labels = torch.tensor(df3_train_class.tolist())
+df4_train_seq = torch.tensor(df4_tokens_train['input_ids'])
+df4_train_mask = torch.tensor(df4_tokens_train['attention_mask'])
+df4_train_labels = torch.tensor(df4_train_class.tolist())
 
-df3_test_seq = torch.tensor(df3_tokens_test['input_ids'])
-df3_test_mask = torch.tensor(df3_tokens_test['attention_mask'])
-df3_test_labels = torch.tensor(df3_test_class.tolist())
+df4_test_seq = torch.tensor(df4_tokens_test['input_ids'])
+df4_test_mask = torch.tensor(df4_tokens_test['attention_mask'])
+df4_test_labels = torch.tensor(df4_test_class.tolist())
 
 # Create data loader
-dataset = TensorDataset(df3_train_seq, df3_train_mask, df3_train_labels)
+dataset = TensorDataset(df4_train_seq, df4_train_mask, df4_train_labels)
 
 # Set up cross-validation
 n_splits = 5
@@ -104,7 +104,7 @@ cv_reports = []
 final_reports = []
 
 # Perform cross-validation
-for fold, (train_idx, val_idx) in enumerate(skf.split(df3_train_seq, df3_train_labels)):
+for fold, (train_idx, val_idx) in enumerate(skf.split(df4_train_seq, df4_train_labels)):
     print(f"Fold: {fold + 1}/{n_splits}")
 
     # Split data into train and validation sets
@@ -169,7 +169,7 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(df3_train_seq, df3_train_l
     model.load_state_dict(torch.load(f"best_model_fold{fold + 1}.pth"))
 
     # Predict on the test set
-    test_dataset = TensorDataset(df3_test_seq, df3_test_mask, df3_test_labels)
+    test_dataset = TensorDataset(df4_test_seq, df4_test_mask, df4_test_labels)
     test_dataloader = DataLoader(test_dataset, batch_size=32)
     model.eval()
     test_preds = []
@@ -181,7 +181,7 @@ for fold, (train_idx, val_idx) in enumerate(skf.split(df3_train_seq, df3_train_l
             test_preds.extend(torch.argmax(pred, axis=1).cpu().detach().numpy())
 
     # Calculate performance metrics on the test set
-    test_report = classification_report(df3_test_labels.tolist(), test_preds)
+    test_report = classification_report(df4_test_labels.tolist(), test_preds)
     print(f"Test Report:\n{test_report}\n")
     final_reports.append(test_report)
 
@@ -192,5 +192,4 @@ for i, report in enumerate(final_reports):
     print(report)
     print()
 
-np.savetxt("df3_BART_preds.csv", test_preds, delimiter=",")
-
+np.savetxt("df4_BART_preds.csv", test_preds, delimiter=",")
