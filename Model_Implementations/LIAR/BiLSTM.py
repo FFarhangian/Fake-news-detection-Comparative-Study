@@ -2,7 +2,97 @@
 
 
 ############################################# GloVe ####################################################
+import numpy as np
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Dense, LSTM, Bidirectional
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
+import joblib
+import timeit
 
+# Tokenize and pad sequences
+MAX_NB_WORDS = 20000
+MAX_SEQUENCE_LENGTH = 300
+tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
+tokenizer.fit_on_texts(df1_train)
+seq_train = tokenizer.texts_to_sequences(df1_train)
+seq_test = tokenizer.texts_to_sequences(df1_test)
+data_train = pad_sequences(seq_train, maxlen=MAX_SEQUENCE_LENGTH)
+data_test = pad_sequences(seq_test, maxlen=MAX_SEQUENCE_LENGTH)
+
+# Define hyperparameters
+activations = 'softmax'
+batch_sizes = [64, 128, 512]
+num_epochs = [5, 20, 100]
+learning_rate = 0.001
+hidden_size = 128
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+k = 5
+kf = KFold(n_splits=k, shuffle=True, random_state=42)
+
+best_accuracy = 0.0
+best_model = None
+
+for batch_size in batch_sizes:
+    for epochs in num_epochs:
+        fold = 1
+        print(f"Batch Size: {batch_size}, Epochs: {epochs}")
+        accuracies = []
+
+        for train_index, val_index in kf.split(data_train):
+            # Split the data into training and validation sets
+            train_data, val_data = data_train[train_index], data_train[val_index]
+            train_labels, val_labels = df1_train_class[train_index], df1_train_class[val_index]
+
+            # Create the model
+            model = Sequential()
+            model.add(Embedding(MAX_NB_WORDS, 300, input_length=MAX_SEQUENCE_LENGTH, name="embeddinglayer",
+                                weights=[embedding_matrix], trainable=False))
+            model.add(Bidirectional(LSTM(hidden_size, dropout=dropout_rate, recurrent_dropout=dropout_rate)))
+            model.add(Dense(32, activation='relu'))
+            model.add(Dense(32, activation='relu'))
+            model.add(Dense(num_classes, activation=activations))
+
+            # Compile the model
+            model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+            # Train the model
+            model.fit(train_data, train_labels, epochs=epochs, batch_size=batch_size, verbose=0)
+
+            # Evaluate on the validation set
+            val_pred = model.predict(val_data)
+            val_pred_classes = np.argmax(val_pred, axis=1)
+            val_labels_classes = np.argmax(val_labels, axis=1)
+            accuracy = accuracy_score(val_labels_classes, val_pred_classes)
+            accuracies.append(accuracy)
+
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                best_model = model
+
+            fold += 1
+
+        mean_accuracy = np.mean(accuracies)
+        print(f"Mean Validation Accuracy: {mean_accuracy:.2f}")
+
+# Train the best model on the full training set
+best_model.fit(data_train, df1_train_class, epochs=num_epochs, batch_size=batch_size, verbose=0)
+
+# Predict on the test set
+df1_Glove_BiLSTM_pred = best_model.predict(data_test)
+df1_Glove_BiLSTM_pred_classes = np.argmax(df1_Glove_BiLSTM_pred, axis=1)
+
+# Evaluate performance on the test set
+test_accuracy = accuracy_score(df1_test_class, df1_Glove_BiLSTM_pred_classes)
+print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
+
+# Save predictions and model
+np.savetxt("df1_Glove_BiLSTM_pred.csv", df1_Glove_BiLSTM_pred_classes, delimiter=",")
+joblib.dump(best_model, 'df1_Glove_BiLSTM.sav')
 
 ############################################# FastText ####################################################
 
