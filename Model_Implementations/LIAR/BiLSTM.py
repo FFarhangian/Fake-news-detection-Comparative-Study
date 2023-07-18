@@ -12,6 +12,19 @@ from sklearn.metrics import accuracy_score
 import joblib
 import timeit
 
+# Load GloVe
+!wget http://nlp.stanford.edu/data/glove.6B.zip
+!unzip glove*.zip
+
+# Load GloVe embeddings
+embeddings_index = {}
+with open('/content/glove.6B.300d.txt', encoding='utf-8') as f:
+    for line in f:
+        values = line.split()
+        word = values[0]
+        coefs = np.asarray(values[1:], dtype='float32')
+        embeddings_index[word] = coefs
+
 # Tokenize and pad sequences
 MAX_NB_WORDS = 20000
 MAX_SEQUENCE_LENGTH = 300
