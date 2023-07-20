@@ -344,6 +344,6 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 np.savetxt("df1_Fasttext_CNN_pred.csv", df1_Fasttext_CNN_pred_classes, delimiter=",")
 joblib.dump(best_model, 'df1_Fasttext_CNN.sav')
 
-#################################### ELMO #################################################3
+#################################### ELMO #################################################
 
 
