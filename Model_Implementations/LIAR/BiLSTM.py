@@ -69,7 +69,7 @@ for batch_size in batch_sizes:
             model.add(Bidirectional(LSTM(hidden_size, dropout=dropout_rate, recurrent_dropout=dropout_rate)))
             model.add(Dense(32, activation='relu'))
             model.add(Dense(32, activation='relu'))
-            model.add(Dense(num_classes, activation=activations))
+            model.add(Dense(6, activation=activations))
 
             # Compile the model
             model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
@@ -184,7 +184,7 @@ for batch_size in batch_sizes:
             model.add(Bidirectional(LSTM(hidden_size, dropout=dropout_rate, recurrent_dropout=dropout_rate)))
             model.add(Dense(32, activation='relu'))
             model.add(Dense(32, activation='relu'))
-            model.add(Dense(num_classes, activation=activations))
+            model.add(Dense(6, activation=activations))
 
             # Compile the model
             model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
@@ -300,7 +300,7 @@ for batch_size in batch_sizes:
             model.add(Bidirectional(LSTM(hidden_size, dropout=dropout_rate, recurrent_dropout=dropout_rate)))
             model.add(Dense(32, activation='relu'))
             model.add(Dense(32, activation='relu'))
-            model.add(Dense(num_classes, activation=activations))
+            model.add(Dense(6, activation=activations))
 
             # Compile the model
             model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
