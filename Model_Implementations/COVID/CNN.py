@@ -358,5 +358,1424 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 np.savetxt("df3_Fasttext_CNN_pred.csv", df3_Fasttext_CNN_pred_classes, delimiter=",")
 joblib.dump(best_model, 'df3_Fasttext_CNN.sav')
 
-############################################### ELMO ##########################################
+############################################# ELMO ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
 
+# Load the ELMO features
+feature_matrix_train = np.load('ELMO_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('ELMO_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_ELMO_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# BERT ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the BERT features
+feature_matrix_train = np.load('BERT_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('BERT_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_BERT_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# DistilBERT ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the DistilBERT features
+feature_matrix_train = np.load('DistilBERT_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('DistilBERT_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_DistilBERT_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# BART ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the BART features
+feature_matrix_train = np.load('BART_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('BART_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_BART_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# ALBERT ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the ALBERT features
+feature_matrix_train = np.load('ALBERT_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('ALBERT_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_ALBERT_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# RoBERTa ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the RoBERTa features
+feature_matrix_train = np.load('RoBERTa_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('RoBERTa_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_RoBERTa_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+
+############################################# ELECTRA ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the ELECTRA features
+feature_matrix_train = np.load('ELECTRA_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('ELECTRA_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_ELECTRA_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
+
+############################################# XLNET ####################################################
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from sklearn.model_selection import KFold
+from sklearn.metrics import classification_report
+from sklearn.externals import joblib
+import pandas as pd
+import time
+
+# Load the XLNET features
+feature_matrix_train = np.load('XLNET_df3_train.npz')['arr_0']
+feature_matrix_test = np.load('XLNET_df3_test.npz')['arr_0']
+labels_train = df3_train_class.to_numpy().flatten()
+labels_test = df3_test_class.to_numpy().flatten()
+
+# Convert the numpy arrays to PyTorch tensors
+features_train = torch.tensor(feature_matrix_train, dtype=torch.float32)
+features_test = torch.tensor(feature_matrix_test, dtype=torch.float32)
+labels_train = torch.tensor(labels_train, dtype=torch.long)
+labels_test = torch.tensor(labels_test, dtype=torch.long)
+
+# Define the CNN model
+class CNN(nn.Module):
+    def __init__(self, input_size, dropout_rate=0.2, activation='relu'):
+        super(CNN, self).__init__()
+        self.embedding = nn.Embedding(input_size, 128)
+        self.conv1 = nn.Conv1d(128, 128, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(128, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool1d(kernel_size=2)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc1 = nn.Linear(32, 180)
+        self.fc2 = nn.Linear(180, 1 if activation == 'sigmoid' else 6)
+        self.activation = self.get_activation(activation)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = self.conv2(x)
+        x = self.activation(x)
+        x = self.pool(x)
+        x = x.squeeze(dim=2)
+        x = self.dropout(x)
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.fc2(x)
+        return x
+
+    def get_activation(self, activation):
+        if activation == 'relu':
+            return nn.ReLU()
+        elif activation == 'sigmoid':
+            return nn.Sigmoid()
+        else:
+            raise ValueError("Invalid activation function.")
+
+# Set the device (GPU if available, otherwise CPU)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the hyperparameters
+batch_sizes = [64, 128, 512]
+num_epochs_list = [5, 20, 100]
+activations = ['sigmoid', 'relu']
+learning_rate = 0.001
+dropout_rate = 0.2
+
+# Perform 5-fold cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+best_accuracy = 0.0  # Variable to store the best validation accuracy
+best_model = None  # Variable to store the best model
+
+for activation in activations:
+    for batch_size in batch_sizes:
+        for num_epochs in num_epochs_list:
+            fold = 1
+            print(f"Activation: {activation}, Batch Size: {batch_size}, Epochs: {num_epochs}")
+            for train_index, val_index in kf.split(features_train):
+                # Split the data into training and validation sets for hyperparameter tuning and find the best model
+                train_features, val_features = features_train[train_index], features_train[val_index]
+                train_labels, val_labels = labels_train[train_index], labels_train[val_index]
+
+                # Create DataLoaders for training and validation datasets
+                train_dataset = TensorDataset(train_features, train_labels)
+                val_dataset = TensorDataset(val_features, val_labels)
+                train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+                # Initialize the CNN model
+                input_size = int(torch.max(features_train)) + 1
+                model = CNN(input_size, dropout_rate, activation).to(device)
+
+                # Define the loss function and optimizer
+                criterion = nn.BCEWithLogitsLoss() if activation == 'sigmoid' else nn.CrossEntropyLoss()
+                optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+                # Train the CNN model
+                model.train()
+                start_time = time.time()
+                for epoch in range(num_epochs):
+                    for inputs, labels in train_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs.squeeze(), labels.unsqueeze(1) if activation == 'sigmoid' else labels)
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Fold {fold}, Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+                end_time = time.time()
+                train_time = end_time - start_time
+                print(f"Training Time: {train_time:.2f} seconds")
+
+                # Evaluate the CNN model on the validation set
+                model.eval()
+                with torch.no_grad():
+                    correct = 0
+                    total = 0
+                    for inputs, labels in val_loader:
+                        inputs = inputs.long().to(device)
+                        labels = labels.to(device)
+                        outputs = model(inputs)
+                        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+                        total += labels.size(0)
+                        correct += (predicted == labels).sum().item()
+                    accuracy = correct / total
+                    print(f"Fold {fold}, Validation Accuracy: {accuracy:.2%}")
+                    fold += 1
+
+                    # Check if the current model is the best based on validation accuracy
+                    if accuracy > best_accuracy:
+                        best_accuracy = accuracy
+                        best_model = model.state_dict().copy()
+
+# Load the best model
+model.load_state_dict(best_model)
+
+# Save the best model
+joblib.dump(model, 'df3_XLNET_CNN.sav')
+
+# Evaluate the best model on the test set
+model.eval()
+test_dataset = TensorDataset(features_test, labels_test)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+with torch.no_grad():
+    correct = 0
+    total = 0
+    predictions = []
+    start_time = time.time()
+    for inputs, labels in test_loader:
+        inputs = inputs.long().to(device)
+        labels = labels.to(device)
+        outputs = model(inputs)
+        predicted = torch.round(torch.sigmoid(outputs)).squeeze() if activation == 'sigmoid' else torch.argmax(outputs, dim=1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        predictions.extend(predicted.cpu().numpy())
+    end_time = time.time()
+    test_time = end_time - start_time
+    test_accuracy = correct / total
+    print(f"Test Accuracy: {test_accuracy:.2%}")
+    print(f"Test Time: {test_time:.2f} seconds")
+
+    # Save the predictions as a CSV file
+    predictions_df = pd.DataFrame({'True Label': labels_test.cpu().numpy(), 'Predicted Label': predictions})
+    predictions_df.to_csv('predictions.csv', index=False)
+
+    # Generate classification report for the test data
+    classification_rep = classification_report(labels_test.cpu().numpy(), predictions)
+    print("Classification Report:")
+    print(classification_rep)
