@@ -106,7 +106,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df1_Word2Vec_BiLSTM_pred.csv", df1_Word2Vec_BiLSTM_pred_classes, delimiter=",")
-joblib.dump(best_model, 'df1_Word2Vec_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df1_Word2Vec_BiLSTM.h5")
 
 ############################################# GloVe ####################################################
 import numpy as np
@@ -221,7 +223,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df1_Glove_BiLSTM_pred.csv", df1_Glove_BiLSTM_pred_classes, delimiter=",")
-joblib.dump(best_model, 'df1_Glove_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df1_Glove_BiLSTM.h5")
 
 ############################################# FastText ####################################################
 import numpy as np
@@ -337,7 +341,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df1_Fasttext_BiLSTM_pred.csv", df1_Fasttext_BiLSTM_pred_classes, delimiter=",")
-joblib.dump(best_model, 'df1_Fasttext_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df1_Fasttext_BiLSTM.h5")
 
 ############################################# ELMO ####################################################
 import torch
@@ -475,8 +481,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_ELMO_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_ELMO_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -647,8 +653,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_BERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_BERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -819,8 +825,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_DistilBERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_DistilBERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -991,8 +997,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_BART_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_BART_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1163,8 +1169,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_ALBERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_ALBERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1335,8 +1341,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_RoBERTa_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_RoBERTa_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1507,8 +1513,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_ELECTRA_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_ELECTRA_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1679,8 +1685,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df1_XLNET_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df1_XLNET_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
