@@ -105,7 +105,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df2_Word2Vec_BiLSTM_pred.csv", df2_Word2Vec_BiLSTM_pred_binary, delimiter=",")
-joblib.dump(best_model, 'df2_Word2Vec_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df2_Word2Vec_BiLSTM.h5")
 
 ########################################## GloVe ##################################################
 import numpy as np
@@ -220,7 +222,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df2_Glove_BiLSTM_pred.csv", df2_Glove_BiLSTM_pred_binary, delimiter=",")
-joblib.dump(best_model, 'df2_Glove_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df2_Glove_BiLSTM.h5")
 
 ########################################## FastText ##################################################
 import numpy as np
@@ -335,7 +339,9 @@ print("Test Accuracy: %.2f%%" % (test_accuracy * 100))
 
 # Save predictions and model
 np.savetxt("df2_Fasttext_BiLSTM_pred.csv", df2_Fasttext_BiLSTM_pred_binary, delimiter=",")
-joblib.dump(best_model, 'df2_Fasttext_BiLSTM.sav')
+
+# Save the best model using Keras' model saving
+best_model.save("df2_Fasttext_BiLSTM.h5")
 
 ########################################## ELMO ##################################################
 import torch
@@ -472,8 +478,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_ELMO_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_ELMO_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -642,8 +648,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_BERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_BERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -812,8 +818,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_DistilBERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_DistilBERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -981,8 +987,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_BART_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_BART_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1151,8 +1157,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_ALBERT_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_ALBERT_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1322,8 +1328,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_RoBERTa_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_RoBERTa_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1492,8 +1498,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_ELECTRA_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_ELECTRA_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
@@ -1662,8 +1668,8 @@ for activation in activations:
 # Load the best model
 model.load_state_dict(best_model)
 
-# Save the best model
-joblib.dump(model, 'df2_XLNET_BiLSTM.sav')
+# Save the best model using PyTorch's model saving
+torch.save(model.state_dict(), "df2_XLNET_BiLSTM.pth")
 
 # Evaluate the best model on the test set
 model.eval()
